@@ -1,0 +1,41 @@
+from django.urls import path
+
+from .views import (
+    Activar2FAView,
+    AprobarSolicitudView,
+    Confirmar2FAView,
+    DecisionFirmadaView,
+    LoginView,
+    MedicosAdminView,
+    MenoresView,
+    RechazarSolicitudView,
+    RecuperarClaveView,
+    RefrescoView,
+    RegistroView,
+    RestablecerClaveView,
+    SalirView,
+    SolicitudesView,
+    Verificar2FAView,
+    VerificarEmailView,
+    YoView,
+)
+
+urlpatterns = [
+    path('registro/', RegistroView.as_view(), name='registro'),
+    path('verificar-email/<str:token>/', VerificarEmailView.as_view(), name='verificar-email'),
+    path('solicitudes/', SolicitudesView.as_view(), name='solicitudes'),
+    path('solicitudes/<int:usuario_id>/aprobar/', AprobarSolicitudView.as_view(), name='aprobar-solicitud'),
+    path('solicitudes/<int:usuario_id>/rechazar/', RechazarSolicitudView.as_view(), name='rechazar-solicitud'),
+    path('solicitudes/decision/', DecisionFirmadaView.as_view(), name='decision-firmada'),
+    path('login/', LoginView.as_view(), name='login'),
+    path('login/2fa/', Verificar2FAView.as_view(), name='login-2fa'),
+    path('refresh/', RefrescoView.as_view(), name='refresh'),
+    path('salir/', SalirView.as_view(), name='salir'),
+    path('yo/', YoView.as_view(), name='yo'),
+    path('2fa/activar/', Activar2FAView.as_view(), name='2fa-activar'),
+    path('2fa/confirmar/', Confirmar2FAView.as_view(), name='2fa-confirmar'),
+    path('recuperar/', RecuperarClaveView.as_view(), name='recuperar'),
+    path('restablecer/', RestablecerClaveView.as_view(), name='restablecer'),
+    path('menores/', MenoresView.as_view(), name='menores'),
+    path('medicos/', MedicosAdminView.as_view(), name='medicos-admin'),
+]
