@@ -38,12 +38,12 @@ class HorarioSerializer(serializers.ModelSerializer):
 
     def validate_duracion_minutos(self, value):
         if value < 10 or value > 120:
-            raise serializers.ValidationError('La duración de cada cupo debe estar entre 10 y 120 minutos.')
+            raise serializers.ValidationError('La duración de cada cupo debe ser entre 10 y 120 minutos.')
         return value
 
     def validate_fecha(self, value):
         if value < timezone.localdate():
-            raise serializers.ValidationError('Asigne una fecha de hoy en adelante.')
+            raise serializers.ValidationError('Realiza una asignación para una fecha posterior a la actual.')
         return value
 
     def validate(self, attrs):

@@ -16,8 +16,7 @@ export default function AsignarJornadaForm({ medicos, onSubmit }) {
     <form className="formulario tarjeta apartado-panel" onSubmit={onSubmit}>
       <h2>Asignar jornada</h2>
       <p className="nota">
-        Indique el día exacto (fecha). El lunes 27 no se mezcla con el lunes de la semana siguiente.
-        Si el mismo día hay mañana y tarde, guarde dos jornadas.
+        Indique la fecha y el médico. Si el mismo día hay mañana y tarde, guarde dos jornadas.
       </p>
       <label>
         Médico

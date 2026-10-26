@@ -53,12 +53,12 @@ export default function Registro() {
       <section className="acceso-panel acceso-ancho">
         <p className="sobrelinea">Registro de paciente</p>
         <h1>Crear cuenta</h1>
-        <p className="lead">La cuenta es para un adulto. Los menores se solicitan después y un administrador valida el documento.</p>
+        <p className="lead">Ingresa los datos de tu cuenta para poder acceder a los servicios de Tu Salud CM.</p>
         <Alerta>{error}</Alerta>
         <Alerta tipo="ok">{aviso}</Alerta>
         {enlace && (
           <p className="nota">
-            Prototipo local, el correo también aparece en la consola del servidor.{' '}
+            Prototipo local en consola.{' '}
             <a href={enlace}>Confirmar correo</a>
           </p>
         )}

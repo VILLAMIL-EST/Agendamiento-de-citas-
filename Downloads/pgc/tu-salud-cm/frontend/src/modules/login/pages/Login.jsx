@@ -68,7 +68,8 @@ export default function Login() {
       <section className="acceso-panel">
         <p className="sobrelinea">E.S.E. Hospital El Salvador de Ubaté</p>
         <h1>Tu Salud CM</h1>
-        <p className="lead">Ingrese con el correo o la cédula, y la contraseña de su cuenta.</p>
+        <p>   </p>
+        <p>   </p>
         <Alerta>{error}</Alerta>
         {!preAuth ? (
           <FormularioCredenciales
@@ -81,7 +82,7 @@ export default function Login() {
           />
         ) : (
           <form onSubmit={confirmarCodigo} className="formulario">
-            <p>Escriba el código de seis dígitos de su aplicación de autenticación.</p>
+            <p>Por favor, escriba el código de seis dígitos de su aplicación de autenticación.</p>
             <label>
               Código
               <input inputMode="numeric" value={codigo} onChange={(e) => setCodigo(e.target.value)} required />

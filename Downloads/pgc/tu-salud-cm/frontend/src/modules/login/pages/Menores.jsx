@@ -50,7 +50,7 @@ export default function Menores() {
     setError('')
     setAviso('')
     if (!soporte) {
-      setError('Adjunte una foto o un PDF del documento del menor.')
+      setError('Adjunte una foto (Tutor y del menor), o un PDF ')
       return
     }
     const formulario = new FormData()
@@ -62,7 +62,7 @@ export default function Menores() {
       setDatos(INICIAL)
       setSoporte(null)
       evento.target.reset()
-      setAviso('La solicitud quedó en revisión. El menor no se crea hasta que administración valide el documento.')
+      setAviso('La solicitud quedó en revisión del administrador por favor espere una respuesta de la administración.')
       cargar()
     } catch (err) {
       setError(mensajeError(err))

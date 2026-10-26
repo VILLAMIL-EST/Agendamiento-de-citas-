@@ -6,8 +6,8 @@ import { calendarioMedico, registrarAsistencia } from '../services/agendaService
 import { formatearFecha } from '../utils/fechas'
 
 const PLAZO_MS = 30 * 60 * 1000
-const AVISO_ANTES = 'Podrá modificar la cita desde su hora de inicio y hasta 30 minutos después de que termine.'
-const AVISO_VENCIDO = 'La cita ya venció. Solo puede consultar la información, el motivo y los documentos cargados.'
+const AVISO_ANTES = 'Podrá modificar la cita desde su hora de inicio o hasta 30 minutos después de que termine.'
+const AVISO_VENCIDO = 'La cita ya venció Solo puede visualizar la información.'
 const TIPOS_PDF = {
   reporte: 'Reporte clínico',
   laboratorio: 'Laboratorio',

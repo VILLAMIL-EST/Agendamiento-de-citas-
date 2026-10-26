@@ -10,7 +10,7 @@ def validar_soporte(archivo):
     Devuelve 'pdf' o 'imagen'.
     """
     if archivo is None:
-        raise ValidationError('Adjunte una foto o un PDF del documento del menor.')
+        raise ValidationError('Adjunte un PDF del documento del menor o una foto del mismo.')
 
     contenido = archivo.read()
     archivo.seek(0)
