@@ -21,8 +21,10 @@ from .services import (
     bloquear_cupo,
     cancelar_cita,
     confirmar_cupo,
+    detalle_cupos_horario,
     generar_cupos,
     liberar_cupo,
+    fechas_con_cupos,
     listar_cupos,
     paciente_del_usuario,
     registrar_asistencia,
@@ -35,6 +37,19 @@ class MedicosDisponiblesView(APIView):
     def get(self, request):
         medicos = Medico.objects.filter(activo=True).select_related('usuario')
         return Response(MedicoSerializer(medicos, many=True).data)
+
+
+class FechasDisponiblesView(APIView):
+    permission_classes = [IsPaciente]
+
+    def get(self, request):
+        try:
+            medico_id = int(request.query_params.get('medico'))
+        except (TypeError, ValueError):
+            raise ValidationError({'detail': 'Indique el médico.'})
+        if not Medico.objects.filter(pk=medico_id, activo=True).exists():
+            raise ValidationError({'detail': 'El médico no está disponible en el canal web.'})
+        return Response({'medico': medico_id, 'fechas': fechas_con_cupos(medico_id, request.user)})
 
 
 class DisponibilidadView(APIView):
@@ -108,6 +123,29 @@ class CancelarCitaView(APIView):
         return Response({'detail': 'La cita fue cancelada y el cupo volvió a la oferta web.'})
 
 
+def _evento_calendario(cita):
+    paciente = cita.paciente
+    usuario = paciente.usuario if paciente and paciente.usuario_id else None
+    tutor = paciente.tutor if paciente and paciente.tutor_id else None
+    return {
+        'id': cita.id,
+        'title': paciente.nombre_completo if paciente else 'Cupo bloqueado',
+        'start': timezone.localtime(cita.inicio).isoformat(),
+        'end': timezone.localtime(cita.fin).isoformat(),
+        'estado': cita.estado,
+        'motivo': cita.motivo,
+        'paciente_id': paciente.id if paciente else None,
+        'nombres': paciente.nombres if paciente else '',
+        'apellidos': paciente.apellidos if paciente else '',
+        'tipo_documento': paciente.tipo_documento if paciente else '',
+        'numero_documento': paciente.numero_documento if paciente else '',
+        'fecha_nacimiento': paciente.fecha_nacimiento.isoformat() if paciente else '',
+        'telefono': usuario.telefono if usuario else '',
+        'email': usuario.email if usuario else '',
+        'tutor_nombre': tutor.nombre_completo if tutor else '',
+    }
+
+
 class CalendarioMedicoView(APIView):
     permission_classes = [IsMedico]
 
@@ -120,16 +158,13 @@ class CalendarioMedicoView(APIView):
             citas = citas.filter(inicio__date__gte=desde)
         if hasta:
             citas = citas.filter(inicio__date__lte=hasta)
-        citas = citas.select_related('paciente', 'medico__usuario').order_by('inicio')
+        citas = citas.select_related(
+            'paciente__usuario',
+            'paciente__tutor',
+            'medico__usuario',
+        ).order_by('inicio')
         eventos = [
-            {
-                'id': cita.id,
-                'title': cita.paciente.nombre_completo if cita.paciente_id else 'Cupo bloqueado',
-                'start': cita.inicio.isoformat(),
-                'end': cita.fin.isoformat(),
-                'estado': cita.estado,
-                'motivo': cita.motivo,
-            }
+            _evento_calendario(cita)
             for cita in citas
             if cita.estado != Cita.Estado.BLOQUEADO or (
                 cita.lease_expires_at and cita.lease_expires_at >= timezone.now()
@@ -185,6 +220,17 @@ class HorarioDetalleView(APIView):
         if not eliminados:
             raise ValidationError({'detail': 'El horario no existe.'})
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class HorarioCitasView(APIView):
+    permission_classes = [IsAdmin]
+
+    def get(self, request, horario_id):
+        try:
+            horario = Horario.objects.get(pk=horario_id)
+        except Horario.DoesNotExist:
+            raise ValidationError({'detail': 'El horario no existe.'})
+        return Response(detalle_cupos_horario(horario))
 
 
 class GenerarCuposView(APIView):

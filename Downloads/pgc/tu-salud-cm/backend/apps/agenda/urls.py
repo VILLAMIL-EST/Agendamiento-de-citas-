@@ -7,7 +7,9 @@ from .views import (
     CancelarCitaView,
     ConfirmarCupoView,
     DisponibilidadView,
+    FechasDisponiblesView,
     GenerarCuposView,
+    HorarioCitasView,
     HorarioDetalleView,
     HorariosView,
     LiberarCupoView,
@@ -18,6 +20,7 @@ from .views import (
 urlpatterns = [
     path('medicos/', MedicosDisponiblesView.as_view(), name='medicos'),
     path('disponibilidad/', DisponibilidadView.as_view(), name='disponibilidad'),
+    path('fechas-disponibles/', FechasDisponiblesView.as_view(), name='fechas-disponibles'),
     path('citas/bloquear/', BloquearCupoView.as_view(), name='bloquear'),
     path('citas/<int:cita_id>/liberar/', LiberarCupoView.as_view(), name='liberar'),
     path('citas/<int:cita_id>/confirmar/', ConfirmarCupoView.as_view(), name='confirmar'),
@@ -27,5 +30,6 @@ urlpatterns = [
     path('citas/<int:cita_id>/asistencia/', AsistenciaView.as_view(), name='asistencia'),
     path('horarios/', HorariosView.as_view(), name='horarios'),
     path('horarios/<int:horario_id>/', HorarioDetalleView.as_view(), name='horario-detalle'),
+    path('horarios/<int:horario_id>/citas/', HorarioCitasView.as_view(), name='horario-citas'),
     path('cupos/generar/', GenerarCuposView.as_view(), name='generar-cupos'),
 ]

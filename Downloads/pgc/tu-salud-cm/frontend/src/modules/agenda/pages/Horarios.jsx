@@ -32,8 +32,10 @@ export default function Horarios() {
   const [documento, setDocumento] = useState('')
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
+  const [vistaLista, setVistaLista] = useState('lista')
 
   function irA(clave) {
+    setVistaLista('lista')
     setParams({ apartado: clave })
   }
 
@@ -106,13 +108,17 @@ export default function Horarios() {
 
   return (
     <section>
-      <p className="sobrelinea">Oferta del canal web</p>
-      <h1>Horarios</h1>
-      <p className="lead">
-        Primero registre al médico, luego asigne la jornada con fecha, abra los cupos de esa semana
-        y revise el estado en la lista.
-      </p>
-      <div className="subapartados">
+      {vistaLista === 'lista' && (
+        <>
+          <p className="sobrelinea">Oferta del canal web</p>
+          <h1>Horarios</h1>
+          <p className="lead">
+            Primero registre al médico, luego asigne la jornada con fecha, abra los cupos de esa semana
+            y revise el estado en la lista.
+          </p>
+        </>
+      )}
+      {vistaLista === 'lista' && <div className="subapartados">
         {APARTADOS.map(([clave, titulo]) => (
           <button
             key={clave}
@@ -127,7 +133,7 @@ export default function Horarios() {
             {titulo}
           </button>
         ))}
-      </div>
+      </div>}
       <Alerta>{error}</Alerta>
       <Alerta tipo="ok">{aviso}</Alerta>
       {apartado === 'medico' && <RegistroMedicoForm onSubmit={altaMedico} />}
@@ -141,6 +147,7 @@ export default function Horarios() {
           onFiltro={setFiltro}
           onDocumento={setDocumento}
           onEliminar={eliminar}
+          onVista={setVistaLista}
         />
       )}
     </section>

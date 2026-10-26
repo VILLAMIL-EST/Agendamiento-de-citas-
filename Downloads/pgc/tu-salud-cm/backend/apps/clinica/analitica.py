@@ -1,8 +1,6 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-from django.db.models import Count
-from django.db.models.functions import TruncDay
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework.exceptions import ValidationError
@@ -37,22 +35,27 @@ class ResumenAnaliticaView(APIView):
             Cita.Estado.ATENDIDO,
             Cita.Estado.NO_ASISTIO,
         ]
-        filas = (
-            Cita.objects.filter(inicio__gte=inicio, inicio__lte=fin, estado__in=estados)
-            .annotate(dia=TruncDay('inicio'))
-            .values('dia', 'estado')
-            .annotate(total=Count('id'))
-            .order_by('dia')
-        )
+        ahora = timezone.now()
+        filas = Cita.objects.filter(
+            inicio__gte=inicio,
+            inicio__lte=fin,
+            estado__in=estados,
+        ).order_by('inicio').values_list('inicio', 'fin', 'estado')
 
         serie = defaultdict(lambda: {
             'confirmado': 0,
             'atendido': 0,
             'no_asistio': 0,
+            'inconsistencia': 0,
         })
-        for fila in filas:
-            marca = timezone.localtime(fila['dia'])
-            serie[marca.strftime('%d/%m')][fila['estado']] = fila['total']
+        for inicio_cita, fin_cita, estado in filas:
+            if estado == Cita.Estado.CONFIRMADO and fin_cita + timedelta(minutes=30) < ahora:
+                # El médico no registró asistencia dentro del plazo.
+                clave = 'inconsistencia'
+            else:
+                clave = estado
+            marca = timezone.localtime(inicio_cita)
+            serie[marca.strftime('%d/%m')][clave] += 1
 
         datos = [
             {'etiqueta': etiqueta, **valores}
@@ -62,6 +65,7 @@ class ResumenAnaliticaView(APIView):
             'confirmado': sum(item['confirmado'] for item in datos),
             'atendido': sum(item['atendido'] for item in datos),
             'no_asistio': sum(item['no_asistio'] for item in datos),
+            'inconsistencia': sum(item['inconsistencia'] for item in datos),
         }
         ofertados = Cita.objects.filter(inicio__gte=inicio, inicio__lte=fin).count()
         return Response({

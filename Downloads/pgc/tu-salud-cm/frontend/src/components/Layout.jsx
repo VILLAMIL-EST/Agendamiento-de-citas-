@@ -10,7 +10,6 @@ const ENLACES = {
   ],
   medico: [
     ['/calendario', 'Calendario'],
-    ['/cargar-resultado', 'Cargar resultado'],
   ],
   admin: [
     ['/solicitudes', 'Solicitudes'],

@@ -15,7 +15,6 @@ const MisCitas = lazy(() => import('../modules/agenda/pages/MisCitas'))
 const CalendarioSemanal = lazy(() => import('../modules/agenda/pages/CalendarioSemanal'))
 const Horarios = lazy(() => import('../modules/agenda/pages/Horarios'))
 const Resultados = lazy(() => import('../modules/clinica/pages/Resultados'))
-const SubirResultado = lazy(() => import('../modules/clinica/pages/SubirResultado'))
 const Solicitudes = lazy(() => import('../modules/admin/pages/Solicitudes'))
 const DecidirSolicitud = lazy(() => import('../modules/admin/pages/DecidirSolicitud'))
 const Dashboard = lazy(() => import('../modules/admin/pages/Dashboard'))
@@ -39,7 +38,7 @@ export default function AppRouter() {
             </Route>
             <Route element={<Protegido rol="medico" />}>
               <Route path="calendario" element={<CalendarioSemanal />} />
-              <Route path="cargar-resultado" element={<SubirResultado />} />
+              <Route path="cargar-resultado" element={<Navigate to="/calendario" replace />} />
             </Route>
             <Route element={<Protegido rol="admin" />}>
               <Route path="solicitudes" element={<Solicitudes />} />

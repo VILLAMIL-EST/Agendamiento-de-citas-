@@ -274,6 +274,15 @@ def registrar_asistencia(cita_id, medico, estado):
         raise ValidationError({'detail': 'La cita no está asignada a este profesional.'})
     if cita.estado not in (Cita.Estado.CONFIRMADO, Cita.Estado.ATENDIDO, Cita.Estado.NO_ASISTIO):
         raise ValidationError({'detail': 'La cita todavía no está confirmada.'})
+    ahora = timezone.now()
+    if ahora < cita.inicio:
+        raise ValidationError({
+            'detail': 'Podrá modificar la cita desde su hora de inicio y hasta 30 minutos después de que termine.',
+        })
+    if ahora > cita.fin + timedelta(minutes=30):
+        raise ValidationError({
+            'detail': 'La cita ya venció. Solo puede consultar la información cargada.',
+        })
     cita.estado = estado
     cita.save(update_fields=['estado', 'actualizado'])
     EventoCita.objects.create(
@@ -283,6 +292,110 @@ def registrar_asistencia(cita_id, medico, estado):
         paciente=cita.paciente,
     )
     return cita
+
+
+def _franjas_horario(horario):
+    """Cada cupo de la jornada, con la misma regla con la que se publican."""
+    zona = timezone.get_current_timezone()
+    cursor = timezone.make_aware(datetime.combine(horario.fecha, horario.hora_inicio), zona)
+    limite = timezone.make_aware(datetime.combine(horario.fecha, horario.hora_fin), zona)
+    paso = timedelta(minutes=horario.duracion_minutos)
+    franjas = []
+    while cursor + paso <= limite:
+        franjas.append((cursor, cursor + paso))
+        cursor += paso
+    return franjas
+
+
+def _contacto_paciente(paciente):
+    if paciente is None:
+        return None
+    usuario = paciente.usuario if paciente.usuario_id else None
+    tutor = paciente.tutor if paciente.tutor_id else None
+    if usuario is None and tutor is not None and tutor.usuario_id:
+        usuario = tutor.usuario
+    return {
+        'nombres': paciente.nombres,
+        'apellidos': paciente.apellidos,
+        'tipo_documento': paciente.tipo_documento,
+        'numero_documento': paciente.numero_documento,
+        'fecha_nacimiento': paciente.fecha_nacimiento.isoformat(),
+        'telefono': usuario.telefono if usuario else '',
+        'email': usuario.email if usuario else '',
+        'tutor_nombre': tutor.nombre_completo if tutor else '',
+    }
+
+
+def detalle_cupos_horario(horario):
+    """
+    Cupos de una jornada, publicados o todavía solo asignados.
+
+    Una cita confirmada, atendida o con inasistencia cuenta como tomada.
+    Si sigue confirmada después del plazo de asistencia, se muestra como inconsistencia.
+    """
+    franjas = _franjas_horario(horario)
+    citas = {
+        cita.inicio: cita
+        for cita in Cita.objects.filter(
+            medico_id=horario.medico_id,
+            inicio__in=[inicio for inicio, _fin in franjas],
+        ).select_related('paciente__usuario', 'paciente__tutor__usuario', 'solicitante')
+    }
+    ahora = timezone.now()
+    filas = []
+    for inicio, fin in franjas:
+        cita = citas.get(inicio)
+        paciente = None
+        motivo = ''
+        solicitante = ''
+        cita_id = None
+        if cita is None:
+            estado = 'sin_publicar' if not horario.publicada else 'no_abierto'
+        else:
+            cita_id = cita.id
+            lease_vigente = (
+                cita.estado == Cita.Estado.BLOQUEADO
+                and cita.lease_expires_at
+                and cita.lease_expires_at >= ahora
+            )
+            if cita.estado == Cita.Estado.BLOQUEADO and not lease_vigente:
+                estado = 'disponible'
+            elif (
+                cita.estado == Cita.Estado.CONFIRMADO
+                and cita.fin + timedelta(minutes=30) < ahora
+            ):
+                estado = 'inconsistencia'
+            else:
+                estado = cita.estado
+            if estado not in ('disponible',):
+                paciente = _contacto_paciente(cita.paciente)
+                motivo = cita.motivo
+                if cita.solicitante_id and cita.solicitante_id != cita.paciente_id:
+                    solicitante = cita.solicitante.nombre_completo
+        tomada = estado in (
+            'confirmado',
+            'atendido',
+            'no_asistio',
+            'inconsistencia',
+        )
+        filas.append({
+            'id': cita_id,
+            'inicio': timezone.localtime(inicio).isoformat(),
+            'fin': timezone.localtime(fin).isoformat(),
+            'estado': estado,
+            'tomada': tomada,
+            'motivo': motivo,
+            'solicitante_nombre': solicitante,
+            'paciente': paciente,
+        })
+    return {
+        'citas': filas,
+        'resumen': {
+            'total': len(filas),
+            'tomadas': sum(1 for fila in filas if fila['tomada']),
+            'libres': sum(1 for fila in filas if fila['estado'] == 'disponible'),
+        },
+    }
 
 
 def horarios_se_solapan(inicio_a, fin_a, inicio_b, fin_b):
@@ -353,6 +466,30 @@ def generar_cupos(medico, desde, hasta):
     for fecha in fechas:
         invalidar_cupos(medico.id, fecha)
     return creados
+
+
+def fechas_con_cupos(medico_id, usuario=None):
+    """Días futuros en los que el médico aún tiene al menos un cupo libre."""
+    liberar_leases_expirados()
+    ahora = timezone.now()
+    fechas = set(
+        Cita.objects.filter(
+            medico_id=medico_id,
+            estado=Cita.Estado.DISPONIBLE,
+            inicio__gt=ahora,
+        ).dates('inicio', 'day')
+    )
+    if usuario is not None and usuario.is_authenticated:
+        fechas.update(
+            Cita.objects.filter(
+                medico_id=medico_id,
+                estado=Cita.Estado.BLOQUEADO,
+                leased_by=usuario,
+                lease_expires_at__gte=ahora,
+                inicio__gt=ahora,
+            ).dates('inicio', 'day')
+        )
+    return [fecha.isoformat() for fecha in sorted(fechas)]
 
 
 def listar_cupos(medico_id, fecha, usuario=None):

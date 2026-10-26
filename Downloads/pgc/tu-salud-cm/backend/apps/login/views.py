@@ -8,9 +8,11 @@ from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
+from django.http import FileResponse
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.exceptions import AuthenticationFailed, ValidationError
+from rest_framework.exceptions import AuthenticationFailed, NotFound, ValidationError
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -25,7 +27,8 @@ from .correo import (
     enviar_rechazo,
     enviar_verificacion,
 )
-from .models import Medico, Paciente, Usuario
+from .models import Medico, Paciente, SolicitudTutela, Usuario
+from .soporte import content_type_soporte
 from .verificacion import asignar_token, buscar_por_token, cupo_de_registro
 from .permissions import IsAdmin, IsPaciente
 from .serializers import (
@@ -33,6 +36,7 @@ from .serializers import (
     MedicoSerializer,
     MenorSerializer,
     RegistroPacienteSerializer,
+    SolicitudTutelaSerializer,
     UsuarioSerializer,
 )
 from .tokens import TokenRefresco, token_preautenticacion
@@ -378,7 +382,10 @@ class RestablecerClaveView(APIView):
 
 
 class MenoresView(APIView):
+    """Lista solo menores ya aprobados. El alta queda como solicitud de tutela."""
+
     permission_classes = [IsPaciente]
+    parser_classes = [MultiPartParser, FormParser]
 
     def get(self, request):
         tutor = request.user.perfil_paciente
@@ -387,11 +394,126 @@ class MenoresView(APIView):
 
     def post(self, request):
         tutor = request.user.perfil_paciente
-        serializador = MenorSerializer(data=request.data)
+        serializador = SolicitudTutelaSerializer(data=request.data, context={'tutor': tutor})
         serializador.is_valid(raise_exception=True)
-        menor = serializador.save(tutor=tutor, usuario=None)
-        registrar(request, 'menor_registrado', usuario=request.user, recurso=str(menor.pk))
-        return Response(MenorSerializer(menor).data, status=status.HTTP_201_CREATED)
+        solicitud = serializador.save()
+        registrar(request, 'tutela_solicitada', usuario=request.user, recurso=str(solicitud.pk))
+        return Response(SolicitudTutelaSerializer(solicitud).data, status=status.HTTP_201_CREATED)
+
+
+class SolicitudesTutelaPacienteView(APIView):
+    permission_classes = [IsPaciente]
+
+    def get(self, request):
+        tutor = request.user.perfil_paciente
+        solicitudes = tutor.solicitudes_tutela.all()
+        return Response(SolicitudTutelaSerializer(solicitudes, many=True).data)
+
+
+class SolicitudesTutelaAdminView(APIView):
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        solicitudes = SolicitudTutela.objects.select_related('tutor').order_by('-creado')
+        if request.query_params.get('vista') != 'historial':
+            solicitudes = solicitudes.filter(estado=SolicitudTutela.Estado.PENDIENTE)
+        return Response(SolicitudTutelaSerializer(solicitudes, many=True).data)
+
+
+def _solicitud_tutela_pendiente(solicitud_id):
+    try:
+        solicitud = SolicitudTutela.objects.select_related('tutor').get(pk=solicitud_id)
+    except SolicitudTutela.DoesNotExist as exc:
+        raise ValidationError({'detail': 'La solicitud de tutela no existe.'}) from exc
+    if solicitud.estado != SolicitudTutela.Estado.PENDIENTE:
+        raise ValidationError({'detail': 'Esta tutela ya no está pendiente de aprobación.'})
+    return solicitud
+
+
+class AprobarTutelaView(APIView):
+    permission_classes = [IsAdmin]
+
+    def post(self, request, solicitud_id):
+        solicitud = _solicitud_tutela_pendiente(solicitud_id)
+        if Paciente.objects.filter(numero_documento=solicitud.numero_documento).exists():
+            raise ValidationError({'detail': 'Ese documento ya está registrado.'})
+        menor = Paciente.objects.create(
+            tutor=solicitud.tutor,
+            usuario=None,
+            nombres=solicitud.nombres,
+            apellidos=solicitud.apellidos,
+            tipo_documento=solicitud.tipo_documento,
+            numero_documento=solicitud.numero_documento,
+            fecha_nacimiento=solicitud.fecha_nacimiento,
+        )
+        solicitud.menor = menor
+        solicitud.estado = SolicitudTutela.Estado.APROBADA
+        solicitud.aprobado_por = request.user
+        solicitud.fecha_decision = timezone.now()
+        solicitud.motivo_rechazo = ''
+        solicitud.save(update_fields=[
+            'menor',
+            'estado',
+            'aprobado_por',
+            'fecha_decision',
+            'motivo_rechazo',
+        ])
+        registrar(
+            request,
+            'tutela_aprobada',
+            usuario=request.user,
+            recurso=str(solicitud.pk),
+            detalle=solicitud.numero_documento,
+        )
+        return Response({
+            'detail': 'La tutela fue aprobada. El menor ya puede usarse en citas y resultados.',
+            'estado': solicitud.estado,
+        })
+
+
+class RechazarTutelaView(APIView):
+    permission_classes = [IsAdmin]
+
+    def post(self, request, solicitud_id):
+        solicitud = _solicitud_tutela_pendiente(solicitud_id)
+        solicitud.estado = SolicitudTutela.Estado.RECHAZADA
+        solicitud.aprobado_por = request.user
+        solicitud.fecha_decision = timezone.now()
+        solicitud.motivo_rechazo = str(request.data.get('motivo', '')).strip()[:500]
+        solicitud.save(update_fields=[
+            'estado',
+            'aprobado_por',
+            'fecha_decision',
+            'motivo_rechazo',
+        ])
+        registrar(
+            request,
+            'tutela_rechazada',
+            usuario=request.user,
+            recurso=str(solicitud.pk),
+            detalle=solicitud.motivo_rechazo or solicitud.numero_documento,
+        )
+        return Response({'detail': 'La solicitud de tutela fue rechazada.', 'estado': solicitud.estado})
+
+
+class SoporteTutelaView(APIView):
+    permission_classes = [IsAdmin]
+
+    def get(self, request, solicitud_id):
+        try:
+            solicitud = SolicitudTutela.objects.get(pk=solicitud_id)
+        except SolicitudTutela.DoesNotExist as exc:
+            raise NotFound('No se encontró la solicitud de tutela.') from exc
+        if not solicitud.soporte:
+            raise NotFound('El documento adjunto no está disponible.')
+        try:
+            archivo = solicitud.soporte.open('rb')
+        except FileNotFoundError as exc:
+            raise NotFound('El documento adjunto no está disponible.') from exc
+        tipo = content_type_soporte(solicitud.tipo_soporte, solicitud.soporte.name)
+        respuesta = FileResponse(archivo, content_type=tipo)
+        respuesta['Content-Disposition'] = f'inline; filename="documento-tutela-{solicitud.pk}"'
+        return respuesta
 
 
 class MedicosAdminView(APIView):

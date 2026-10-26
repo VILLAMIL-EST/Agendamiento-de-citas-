@@ -15,3 +15,7 @@ export function listarPacientesDelMedico() {
 export function subirResultado(formulario) {
   return api.post('/resultados/subir/', formulario)
 }
+
+export function listarResultadosDeCita(citaId) {
+  return api.get(`/resultados/cita/${citaId}/`)
+}

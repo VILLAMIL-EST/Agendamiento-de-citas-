@@ -4,7 +4,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Medico, Paciente, Usuario
+from .models import Medico, Paciente, SolicitudTutela, Usuario
+from .soporte import validar_soporte
 
 
 def edad_en(fecha_nacimiento, hoy=None):
@@ -21,6 +22,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
     is_doctor = serializers.BooleanField(read_only=True)
     is_admin = serializers.BooleanField(read_only=True)
     numero_documento = serializers.SerializerMethodField()
+    paciente_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Usuario
@@ -36,7 +38,12 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'is_admin',
             'otp_enabled',
             'numero_documento',
+            'paciente_id',
         ]
+
+    def get_paciente_id(self, usuario):
+        perfil = getattr(usuario, 'perfil_paciente', None)
+        return perfil.id if perfil else None
 
     def get_numero_documento(self, usuario):
         perfil = getattr(usuario, 'perfil_paciente', None)
@@ -143,6 +150,96 @@ class MenorSerializer(serializers.ModelSerializer):
         if consulta.exists():
             raise serializers.ValidationError('Ese documento ya está registrado.')
         return value
+
+
+class SolicitudTutelaSerializer(serializers.ModelSerializer):
+    tutor_nombre = serializers.SerializerMethodField()
+    tutor_documento = serializers.SerializerMethodField()
+    clasificacion = serializers.SerializerMethodField()
+    tiene_soporte = serializers.SerializerMethodField()
+    soporte = serializers.FileField(write_only=True)
+
+    class Meta:
+        model = SolicitudTutela
+        fields = [
+            'id',
+            'nombres',
+            'apellidos',
+            'tipo_documento',
+            'numero_documento',
+            'fecha_nacimiento',
+            'soporte',
+            'tipo_soporte',
+            'estado',
+            'clasificacion',
+            'motivo_rechazo',
+            'fecha_decision',
+            'creado',
+            'tutor_nombre',
+            'tutor_documento',
+            'tiene_soporte',
+        ]
+        read_only_fields = [
+            'id',
+            'tipo_soporte',
+            'estado',
+            'clasificacion',
+            'motivo_rechazo',
+            'fecha_decision',
+            'creado',
+            'tutor_nombre',
+            'tutor_documento',
+            'tiene_soporte',
+        ]
+
+    def get_tutor_nombre(self, solicitud):
+        return solicitud.tutor.nombre_completo
+
+    def get_tutor_documento(self, solicitud):
+        return solicitud.tutor.numero_documento
+
+    def get_clasificacion(self, solicitud):
+        if solicitud.estado == SolicitudTutela.Estado.APROBADA:
+            return 'activo'
+        if solicitud.estado == SolicitudTutela.Estado.RECHAZADA:
+            return 'rechazado'
+        return 'pendiente'
+
+    def get_tiene_soporte(self, solicitud):
+        return bool(solicitud.soporte)
+
+    def validate_tipo_documento(self, value):
+        if value not in (Paciente.TipoDocumento.TI, Paciente.TipoDocumento.RC):
+            raise serializers.ValidationError('Un menor se registra con tarjeta de identidad o registro civil.')
+        return value
+
+    def validate_fecha_nacimiento(self, value):
+        if value > date.today() or edad_en(value) >= 18:
+            raise serializers.ValidationError('La fecha no corresponde a un menor de edad.')
+        return value
+
+    def validate_numero_documento(self, value):
+        if Paciente.objects.filter(numero_documento=value).exists():
+            raise serializers.ValidationError('Ese documento ya está registrado.')
+        if SolicitudTutela.objects.filter(
+            numero_documento=value,
+            estado=SolicitudTutela.Estado.PENDIENTE,
+        ).exists():
+            raise serializers.ValidationError('Ya hay una solicitud pendiente con ese documento.')
+        return value
+
+    def validate_soporte(self, archivo):
+        self._tipo_soporte = validar_soporte(archivo)
+        return archivo
+
+    def create(self, validated):
+        tutor = self.context['tutor']
+        tipo = getattr(self, '_tipo_soporte', SolicitudTutela.TipoSoporte.PDF)
+        return SolicitudTutela.objects.create(
+            tutor=tutor,
+            tipo_soporte=tipo,
+            **validated,
+        )
 
 
 class MedicoAltaSerializer(serializers.Serializer):

@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 from django.db.models import Q
 from django.http import HttpResponse
+from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -7,8 +10,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.login.auditoria import registrar
+from apps.agenda.models import Cita
 from apps.login.models import Paciente
-from apps.login.permissions import IsMedico, IsPaciente
+from apps.login.permissions import IsMedico, IsMedicoOAdmin, IsPaciente
 
 from .models import ResultadoClinico
 from .serializers import ResultadoSerializer
@@ -23,7 +27,7 @@ class ResultadosView(APIView):
     """
     Búsqueda de resultados del paciente autenticado y de sus menores.
 
-    Filtros: nombre (título o paciente), fecha y doctor. Un paciente no puede
+    Filtros: paciente (id visible), fecha y doctor. Un paciente no puede
     consultar resultados de otra familia aunque conozca el identificador.
     """
 
@@ -31,17 +35,25 @@ class ResultadosView(APIView):
 
     def get(self, request):
         tutor = request.user.perfil_paciente
+        visibles = pacientes_visibles(tutor)
         resultados = ResultadoClinico.objects.filter(
-            paciente__in=pacientes_visibles(tutor),
+            paciente__in=visibles,
         ).select_related('paciente', 'medico__usuario')
 
+        paciente_id = (request.query_params.get('paciente') or '').strip()
         nombre = (request.query_params.get('nombre') or '').strip()
         doctor = (request.query_params.get('doctor') or '').strip()
         fecha = parse_date(request.query_params.get('fecha') or '')
         if request.query_params.get('fecha') and fecha is None:
             raise ValidationError({'detail': 'La fecha debe tener el formato AAAA-MM-DD.'})
 
-        if nombre:
+        if paciente_id:
+            try:
+                elegido = visibles.get(pk=int(paciente_id))
+            except (ValueError, Paciente.DoesNotExist) as exc:
+                raise ValidationError({'detail': 'Ese paciente no está a su cargo.'}) from exc
+            resultados = resultados.filter(paciente=elegido)
+        elif nombre:
             resultados = resultados.filter(
                 Q(titulo__icontains=nombre)
                 | Q(paciente__nombres__icontains=nombre)
@@ -89,6 +101,15 @@ class SubirResultadoView(APIView):
             cita = medico.citas.filter(pk=cita_id, paciente=paciente).first()
             if cita is None:
                 raise ValidationError({'detail': 'La cita no corresponde a este profesional y paciente.'})
+            ahora = timezone.now()
+            if ahora < cita.inicio or ahora > cita.fin + timedelta(minutes=30):
+                raise ValidationError({
+                    'detail': 'La cita ya venció. Solo puede consultar la información cargada.',
+                })
+            if cita.estado != 'atendido':
+                raise ValidationError({
+                    'detail': 'Marque que el paciente asistió antes de cargar documentos.',
+                })
         elif not medico.citas.filter(paciente=paciente).exists():
             raise ValidationError({
                 'detail': 'Solo puede cargar resultados de pacientes que tengan una cita con usted.',
@@ -112,17 +133,45 @@ class SubirResultadoView(APIView):
         return Response(ResultadoSerializer(resultado).data, status=201)
 
 
-class DescargarResultadoView(APIView):
-    permission_classes = [IsPaciente]
+class ResultadosCitaMedicoView(APIView):
+    """Documentos ya cargados en una cita, como soporte de lo enviado."""
 
+    permission_classes = [IsMedicoOAdmin]
+
+    def get(self, request, cita_id):
+        if request.user.is_admin:
+            if not Cita.objects.filter(pk=cita_id).exists():
+                raise NotFound('No se encontró la cita.')
+            resultados = ResultadoClinico.objects.filter(cita_id=cita_id)
+        else:
+            medico = request.user.perfil_medico
+            if not medico.citas.filter(pk=cita_id).exists():
+                raise NotFound('No se encontró la cita.')
+            resultados = ResultadoClinico.objects.filter(cita_id=cita_id, medico=medico)
+        resultados = resultados.select_related('paciente', 'medico__usuario')
+        return Response(ResultadoSerializer(resultados, many=True).data)
+
+
+class DescargarResultadoView(APIView):
     def get(self, request, resultado_id):
-        tutor = request.user.perfil_paciente
-        try:
-            resultado = ResultadoClinico.objects.select_related('paciente').get(
+        usuario = request.user
+        resultado = None
+        if getattr(usuario, 'is_patient', False):
+            tutor = usuario.perfil_paciente
+            resultado = ResultadoClinico.objects.select_related('paciente').filter(
                 pk=resultado_id,
                 paciente__in=pacientes_visibles(tutor),
-            )
-        except ResultadoClinico.DoesNotExist:
+            ).first()
+        elif getattr(usuario, 'is_doctor', False):
+            resultado = ResultadoClinico.objects.select_related('paciente').filter(
+                pk=resultado_id,
+                medico=usuario.perfil_medico,
+            ).first()
+        elif getattr(usuario, 'is_admin', False):
+            resultado = ResultadoClinico.objects.select_related('paciente').filter(
+                pk=resultado_id,
+            ).first()
+        if resultado is None:
             raise NotFound('No se encontró el resultado.')
 
         if not resultado.archivo:

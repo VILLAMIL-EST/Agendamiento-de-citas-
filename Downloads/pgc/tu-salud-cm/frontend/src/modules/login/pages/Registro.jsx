@@ -53,7 +53,7 @@ export default function Registro() {
       <section className="acceso-panel acceso-ancho">
         <p className="sobrelinea">Registro de paciente</p>
         <h1>Crear cuenta</h1>
-        <p className="lead">La cuenta es para un adulto. Los menores se agregan después, a cargo del tutor.</p>
+        <p className="lead">La cuenta es para un adulto. Los menores se solicitan después y un administrador valida el documento.</p>
         <Alerta>{error}</Alerta>
         <Alerta tipo="ok">{aviso}</Alerta>
         {enlace && (

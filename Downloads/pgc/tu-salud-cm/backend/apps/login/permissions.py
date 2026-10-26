@@ -17,6 +17,18 @@ class IsMedico(BasePermission):
         return bool(usuario and usuario.is_authenticated and usuario.is_doctor)
 
 
+class IsMedicoOAdmin(BasePermission):
+    message = 'Esta acción solo está disponible para el personal médico o administración.'
+
+    def has_permission(self, request, view):
+        usuario = request.user
+        return bool(
+            usuario
+            and usuario.is_authenticated
+            and (usuario.is_doctor or usuario.is_admin)
+        )
+
+
 class IsAdmin(BasePermission):
     message = 'Esta acción solo está disponible para administración.'
 

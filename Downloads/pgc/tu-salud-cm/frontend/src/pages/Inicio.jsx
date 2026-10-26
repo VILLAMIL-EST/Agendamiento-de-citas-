@@ -7,11 +7,10 @@ const DESTINOS = {
     ['/resultados', 'Ver resultados', 'Descargue el PDF protegido con su número de documento.'],
   ],
   medico: [
-    ['/calendario', 'Agenda de la semana', 'Revise las citas asignadas y registre la asistencia.'],
-    ['/cargar-resultado', 'Cargar un resultado', 'El archivo se cifra antes de guardarse.'],
+    ['/calendario', 'Agenda del mes', 'Entre a la cita para ver al paciente, marcar asistencia y cargar los PDF.'],
   ],
   admin: [
-    ['/solicitudes', 'Solicitudes', 'Valide altas de pacientes y consulte el historial por documento.'],
+    ['/solicitudes', 'Solicitudes', 'Valide altas de titulares, tutelas de menores y el historial por documento.'],
     ['/analitica', 'Analítica', 'Asignación de citas, asistencia y ausentismo del canal web.'],
     ['/horarios', 'Horarios y médicos', 'Registre profesionales, defina jornadas y abra los cupos.'],
     ['/seguridad', 'Seguridad', 'Active el segundo factor y revise el acceso de esta cuenta.'],

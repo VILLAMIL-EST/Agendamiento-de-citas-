@@ -25,9 +25,10 @@ function rangoInicial() {
 }
 
 const METRICAS = [
-  ['confirmado', 'Confirmadas', 'Citas vigentes en el rango'],
+  ['confirmado', 'Confirmadas', 'Aún dentro del plazo de asistencia'],
   ['atendido', 'Atendidas', 'Pacientes que asistieron'],
   ['no_asistio', 'No asistió', 'Inasistencias registradas'],
+  ['inconsistencia', 'Inconsistencia', 'El médico no registró la asistencia a tiempo'],
 ]
 
 export default function Dashboard() {
@@ -87,7 +88,7 @@ export default function Dashboard() {
               </div>
             </div>
             {resumen.serie.length === 0 ? (
-              <p className="nota vacio-grafica">No hay citas confirmadas, atendidas o de inasistencia en ese rango.</p>
+              <p className="nota vacio-grafica">No hay citas confirmadas, atendidas, de inasistencia o de inconsistencia en ese rango.</p>
             ) : (
               <div className="grafica">
                 <ResponsiveContainer width="100%" height="100%">
@@ -102,7 +103,8 @@ export default function Dashboard() {
                     <Legend />
                     <Bar dataKey="confirmado" name="Confirmadas" stackId="citas" fill="#0e6b66" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="atendido" name="Atendidas" stackId="citas" fill="#1f7a4d" />
-                    <Bar dataKey="no_asistio" name="No asistió" stackId="citas" fill="#9d3b32" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="no_asistio" name="No asistió" stackId="citas" fill="#9d3b32" />
+                    <Bar dataKey="inconsistencia" name="Inconsistencia" stackId="citas" fill="#a87424" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

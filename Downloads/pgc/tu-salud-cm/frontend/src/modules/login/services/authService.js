@@ -36,10 +36,18 @@ export function confirmarSegundoFactor(codigo) {
   return api.post('/auth/2fa/confirmar/', { codigo })
 }
 
+export function obtenerYo() {
+  return api.get('/auth/yo/')
+}
+
 export function listarMenores() {
   return api.get('/auth/menores/')
 }
 
-export function crearMenor(payload) {
-  return api.post('/auth/menores/', payload)
+export function listarSolicitudesTutela() {
+  return api.get('/auth/menores/solicitudes/')
+}
+
+export function crearSolicitudTutela(formulario) {
+  return api.post('/auth/menores/', formulario)
 }

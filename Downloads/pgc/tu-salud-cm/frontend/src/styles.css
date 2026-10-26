@@ -110,6 +110,9 @@ input, select {
 .pie-form { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .fila { display: flex; gap: 0.8rem; align-items: end; flex-wrap: wrap; }
 .fila label { min-width: 180px; }
+.fila-filtros { align-items: end; }
+.fila-filtros label { flex: 1 1 180px; }
+.fila-filtros .boton { flex: 0 0 auto; align-self: end; }
 
 .rejilla, .lista { display: grid; gap: 0.9rem; }
 .rejilla { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin: 1rem 0; }
@@ -121,7 +124,8 @@ input, select {
 }
 .tarjeta-enlace { text-decoration: none; color: inherit; }
 .tarjeta-enlace:hover { outline: 2px solid var(--teal); }
-.fila-espacio { display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
+.fila-espacio { display: flex; justify-content: space-between; gap: 0.8rem; align-items: center; flex-wrap: wrap; }
+.fila-espacio h2 { margin: 0; text-align: center; flex: 1 1 auto; }
 .metricas { margin-top: 0; }
 .metrica { border-left: 4px solid var(--teal); }
 .metrica span {
@@ -136,6 +140,7 @@ input, select {
 .metrica-confirmado { border-left-color: #0e6b66; }
 .metrica-atendido { border-left-color: #1d6b45; }
 .metrica-no_asistio { border-left-color: #8d342c; }
+.metrica-inconsistencia { border-left-color: #a87424; }
 .panel-filtro {
   display: flex;
   gap: 1rem;
@@ -149,7 +154,26 @@ input, select {
 .grafica { height: 380px; margin-top: 0.6rem; }
 .vacio-grafica { min-height: 8rem; display: grid; place-items: center; }
 
-.cupos { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0; }
+.pasos-agendar {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  margin: 1rem 0 1.2rem;
+}
+.panel-paso label { margin-top: 0.5rem; }
+.panel-paso .boton-suave { margin-top: 0.8rem; }
+.panel-bloqueado { opacity: 0.7; background: #f3efe6; }
+.panel-bloqueado p { margin: 0.4rem 0 0; }
+.paciente-atender {
+  margin: 0.8rem 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: white;
+}
+.tablero-agenda { margin-top: 0.2rem; }
+.tablero-cupos { display: grid; gap: 1rem; margin-top: 0.8rem; }
+.cupos { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.4rem 0 0; }
 .cupo {
   border: 1px solid var(--line);
   background: white;
@@ -158,6 +182,8 @@ input, select {
   cursor: pointer;
 }
 .cupo:hover { border-color: var(--teal); color: var(--teal-dark); }
+.cupo-activo { background: var(--teal); color: white; border-color: var(--teal); }
+.panel-fechas { grid-column: 1 / -1; }
 
 .alerta { padding: 0.7rem 0.8rem; border-radius: 10px; }
 .alerta-error { background: #fdeceb; color: var(--alert); }
@@ -166,16 +192,25 @@ input, select {
 .estado-atendido { background: #e7f6ee; }
 .estado-no_asistio { background: #fdeceb; }
 .estado-confirmado { background: #e7f3f2; }
+.estado-inconsistencia { background: #f7ecda; color: var(--gold); }
 .estado-propuesta { background: #f7ecda; color: var(--gold); }
 .estado-activa { background: #e7f6ee; color: var(--ok); }
 .estado-activo { background: #e7f6ee; color: var(--ok); }
 .estado-pendiente { background: #f7ecda; color: var(--gold); }
 .estado-rechazado { background: #fdeceb; color: var(--alert); }
 .estado-vencida { background: #eeeae3; color: var(--muted); }
+.estado-disponible { background: #e7f3f2; color: var(--teal-dark); }
+.estado-sin_publicar,
+.estado-no_abierto { background: #eeeae3; color: var(--muted); }
+.estado-bloqueado { background: #f7ecda; color: var(--gold); }
+.cupos-jornada { display: grid; gap: 0.55rem; margin-top: 0.9rem; }
+.detalle-cupo h3 { margin: 0.35rem 0; }
+.cita-dia-activa { box-shadow: inset 0 0 0 2px var(--teal); }
 
 .subapartados { display: flex; gap: 0.45rem; flex-wrap: wrap; margin: 1rem 0; }
 .apartado-panel { max-width: 520px; }
 .filtro-documento { display: grid; gap: 0.3rem; max-width: 320px; margin: 0.8rem 0; }
+.titulo-lista { margin: 1.6rem 0 0.6rem; font-size: 1.15rem; }
 .filtros-jornada { align-items: end; margin-bottom: 0.4rem; }
 .filtros-jornada .subapartados { margin: 0.35rem 0 0; }
 .grupo-fecha { display: grid; gap: 0.7rem; }
@@ -201,9 +236,42 @@ input, select {
 .evento-atendido { background: #1d6b45; border-color: #1d6b45; }
 .evento-no_asistio { background: #8d342c; border-color: #8d342c; }
 .evento-bloqueado { background: #a87424; border-color: #a87424; }
+.tablero-mes { display: grid; gap: 0.8rem; }
+.cabecera-mes { font-size: 0.85rem; color: var(--muted); text-align: center; font-weight: 600; }
+.rejilla-mes { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.4rem; }
+.celda-mes {
+  min-height: 5.2rem;
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 12px;
+  padding: 0.45rem;
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  text-align: left;
+  cursor: pointer;
+}
+.celda-mes span { font-size: 0.78rem; color: var(--teal-dark); }
+.celda-fuera { opacity: 0.45; }
+.celda-hoy { box-shadow: inset 0 0 0 2px var(--teal); }
+.celda-con-citas { background: #eef6f5; }
+.tablero-dia { display: grid; gap: 0.8rem; }
+.cita-dia { display: grid; gap: 0.7rem; }
+.cita-dia h2 { margin: 0 0 0.25rem; font-size: 1.05rem; }
+button.cita-dia { width: 100%; text-align: left; cursor: pointer; color: inherit; }
+.bloque-pdf { display: grid; gap: 0.7rem; padding-bottom: 0.8rem; border-bottom: 1px solid var(--line); }
+.soporte-pdf {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.15rem 0;
+}
+.soporte-pdf p { margin: 0.2rem 0 0; color: var(--muted); }
 
 @media (max-width: 720px) {
   .grilla-form { grid-template-columns: 1fr; }
   .barra { align-items: flex-start; }
   h1 { font-size: 1.7rem; }
+  .celda-mes { min-height: 3.6rem; padding: 0.3rem; }
 }

@@ -1,3 +1,6 @@
+import uuid
+from pathlib import Path
+
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils import timezone
@@ -229,3 +232,86 @@ class AuditoriaAcceso(models.Model):
 
     def __str__(self):
         return f'{self.accion} {self.creado:%Y-%m-%d %H:%M}'
+
+
+def ruta_soporte_tutela(instance, filename):
+    extension = Path(filename or '').suffix.lower()
+    if extension not in {'.pdf', '.jpg', '.jpeg', '.png', '.webp'}:
+        extension = '.bin'
+    return f'tutelas/{instance.tutor_id}/{uuid.uuid4().hex}{extension}'
+
+
+class SolicitudTutela(models.Model):
+    """
+    Petición del titular para quedar como tutor de un menor.
+
+    El perfil del menor no se crea hasta que administración valide el
+    documento (foto o PDF de TI o registro civil).
+    """
+
+    class Estado(models.TextChoices):
+        PENDIENTE = 'pendiente', 'Pendiente'
+        APROBADA = 'aprobada', 'Aprobada'
+        RECHAZADA = 'rechazada', 'Rechazada'
+
+    class TipoSoporte(models.TextChoices):
+        PDF = 'pdf', 'PDF'
+        IMAGEN = 'imagen', 'Imagen'
+
+    tutor = models.ForeignKey(
+        Paciente,
+        on_delete=models.CASCADE,
+        related_name='solicitudes_tutela',
+    )
+    menor = models.OneToOneField(
+        Paciente,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='solicitud_tutela',
+    )
+    nombres = models.CharField(max_length=80)
+    apellidos = models.CharField(max_length=80)
+    tipo_documento = models.CharField(max_length=4, choices=Paciente.TipoDocumento.choices)
+    numero_documento = models.CharField(max_length=20)
+    fecha_nacimiento = models.DateField()
+    soporte = models.FileField(upload_to=ruta_soporte_tutela)
+    tipo_soporte = models.CharField(
+        max_length=10,
+        choices=TipoSoporte.choices,
+        default=TipoSoporte.PDF,
+    )
+    estado = models.CharField(max_length=16, choices=Estado.choices, default=Estado.PENDIENTE)
+    motivo_rechazo = models.TextField(blank=True)
+    aprobado_por = models.ForeignKey(
+        Usuario,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='tutelas_decididas',
+    )
+    fecha_decision = models.DateTimeField(null=True, blank=True)
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'solicitud de tutela'
+        verbose_name_plural = 'solicitudes de tutela'
+        ordering = ['-creado']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['numero_documento'],
+                condition=models.Q(estado='pendiente'),
+                name='tutela_pendiente_documento_unico',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['estado', 'creado']),
+            models.Index(fields=['numero_documento']),
+        ]
+
+    def __str__(self):
+        return f'{self.nombres} {self.apellidos} ({self.estado})'
+
+    @property
+    def nombre_completo(self):
+        return f'{self.nombres} {self.apellidos}'

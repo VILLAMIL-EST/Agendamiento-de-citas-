@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import AuditoriaAcceso, Medico, Paciente, Usuario
+from .models import AuditoriaAcceso, Medico, Paciente, SolicitudTutela, Usuario
 
 
 @admin.register(Usuario)
@@ -42,6 +42,13 @@ class PacienteAdmin(admin.ModelAdmin):
 class MedicoAdmin(admin.ModelAdmin):
     list_display = ('usuario', 'registro_medico', 'especialidad', 'activo')
     search_fields = ('usuario__email', 'registro_medico', 'numero_documento')
+
+
+@admin.register(SolicitudTutela)
+class SolicitudTutelaAdmin(admin.ModelAdmin):
+    list_display = ('nombre_completo', 'tipo_documento', 'numero_documento', 'tutor', 'estado')
+    list_filter = ('estado', 'tipo_documento')
+    search_fields = ('nombres', 'apellidos', 'numero_documento', 'tutor__numero_documento')
 
 
 @admin.register(AuditoriaAcceso)

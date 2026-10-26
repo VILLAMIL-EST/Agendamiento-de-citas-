@@ -31,3 +31,19 @@ export function listarMedicosAdmin() {
 export function crearMedico(payload) {
   return api.post('/auth/medicos/', payload)
 }
+
+export function listarSolicitudesTutelaAdmin(params) {
+  return api.get('/auth/solicitudes-tutela/', { params })
+}
+
+export function aprobarTutela(id) {
+  return api.post(`/auth/solicitudes-tutela/${id}/aprobar/`, {})
+}
+
+export function rechazarTutela(id, motivo) {
+  return api.post(`/auth/solicitudes-tutela/${id}/rechazar/`, { motivo })
+}
+
+export function descargarSoporteTutela(id) {
+  return api.get(`/auth/solicitudes-tutela/${id}/soporte/`, { responseType: 'blob' })
+}
